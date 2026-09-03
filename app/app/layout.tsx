@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   description: "Daystar Christian Centre · Alimosho Region small group management",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sora.variable} ${plexMono.variable}`}>
       <body>{children}</body>

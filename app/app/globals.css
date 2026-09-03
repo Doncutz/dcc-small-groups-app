@@ -40,3 +40,54 @@ select {
   border: 3px solid transparent;
   background-clip: content-box;
 }
+
+/* Below 820px the sidebar becomes a horizontally scrolling strip at the
+   top and the shell goes full-bleed, per the mobile-first layout spec. */
+@media (max-width: 820px) {
+  .dcc-shell {
+    flex-direction: column;
+  }
+  .dcc-sidebar {
+    width: 100%;
+    min-height: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-right: none;
+    border-bottom: 1px solid #e9ecf1;
+  }
+  .dcc-sidebar > div:first-child {
+    display: none;
+  }
+  .dcc-sidebar-items {
+    flex-direction: row !important;
+    gap: 4px !important;
+  }
+  .dcc-sidebar-items a {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .dcc-user-footer {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    flex-shrink: 0;
+  }
+  .dcc-user-meta {
+    display: none;
+  }
+}
+
+.dcc-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+  .dcc-wizard {
+    grid-template-columns: 1fr !important;
+    padding: 16px !important;
+  }
+}

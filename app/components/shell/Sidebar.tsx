@@ -1,101 +1,196 @@
 "use client";
 
 import Image from "next/image";
-import { useApp, Screen } from "@/lib/state";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { colors, mono } from "@/lib/tokens";
-import { pendingCells, scopeRoot, titleFor } from "@/lib/tree";
+import { signOutAction } from "@/lib/auth/actions";
+import type { RoleGroup } from "@/lib/auth/roleHome";
 
 interface NavItem {
-  id: Screen | null;
+  href: string;
   label: string;
   icon: string;
-  badge: string;
+  badge?: number;
 }
 
-export function Sidebar() {
-  const { state, set } = useApp();
+const NAV: Record<RoleGroup, NavItem[]> = {
+  leader: [
+    { href: "/cell", label: "My cell", icon: "▦" },
+    { href: "/cell/report", label: "Sunday report", icon: "▤" },
+    { href: "/cell/follow-ups", label: "Follow-ups", icon: "◎" },
+    { href: "/cell/members", label: "Cell members", icon: "◇" },
+    { href: "/cell/resources", label: "Resources", icon: "↓" },
+  ],
+  coordinator: [
+    { href: "/coordinator", label: "Compliance", icon: "▦" },
+    { href: "/coordinator/approvals", label: "Approvals", icon: "✓" },
+    { href: "/coordinator/cells", label: "Cells", icon: "◇" },
+    { href: "/coordinator/follow-ups", label: "Follow-ups", icon: "◎" },
+    { href: "/coordinator/exports", label: "Exports", icon: "↓" },
+  ],
+  super_admin: [{ href: "/admin", label: "Hierarchy upload", icon: "↑" }],
+};
 
-  const followBadge = state.people.filter((p) => p.status === "Not contacted").length;
-  const apprBadge = pendingCells().length - state.apprDone.length;
-
-  const navSets: Record<string, NavItem[]> = {
-    leader: [
-      { id: "leaderDash", label: "Dashboard", icon: "▦", badge: "" },
-      { id: "report", label: "Sunday report", icon: "▤", badge: state.submitted ? "" : "!" },
-      { id: "follow", label: "Follow-ups", icon: "◎", badge: followBadge ? String(followBadge) : "" },
-      { id: null, label: "Cell members", icon: "◇", badge: "" },
-      { id: null, label: "Resources", icon: "↓", badge: "" },
-    ],
-    coord: [
-      { id: "dash", label: "Compliance", icon: "▦", badge: "" },
-      { id: "appr", label: "Approvals", icon: "✓", badge: apprBadge > 0 ? String(apprBadge) : "" },
-      { id: "cells", label: "Cells", icon: "◇", badge: "" },
-      { id: "cfollow", label: "Follow-ups", icon: "◎", badge: "23" },
-      { id: "exports", label: "Exports", icon: "↓", badge: "" },
-    ],
-  };
-
-  const items = navSets[state.role] || [];
-
-  const scopeLeader = scopeRoot(state.scope).leader;
-  const userInitials = state.role === "leader" ? "BS" : scopeLeader.split(" ").map((x) => x[0]).join("");
-  const userName = state.role === "leader" ? "Boluwatife Sodipo" : scopeLeader;
-  const userRole = state.role === "leader" ? "Cell Leader · Grace Cell" : titleFor(state.scope);
+export function Sidebar({
+  group,
+  userName,
+  userRoleLabel,
+  badges = {},
+}: {
+  group: RoleGroup;
+  userName: string;
+  userRoleLabel: string;
+  badges?: Record<string, number>;
+}) {
+  const pathname = usePathname();
+  const items = NAV[group];
+  const initials = userName
+    .split(" ")
+    .map((x) => x[0])
+    .slice(0, 2)
+    .join("");
 
   return (
-    <div style={{ width: 248, flexShrink: 0, background: "#fff", borderRight: `1px solid ${colors.border}`, padding: "20px 14px", display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 6px 20px", borderBottom: `1px solid ${colors.hairline}`, marginBottom: 16 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 8, background: "#fff", border: `1px solid ${colors.border}`, overflow: "hidden", flexShrink: 0, position: "relative" }}>
+    <nav
+      aria-label="Primary"
+      style={{
+        width: 236,
+        flexShrink: 0,
+        background: "#fff",
+        borderRight: `1px solid ${colors.border}`,
+        padding: "20px 14px",
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+      }}
+      className="dcc-sidebar"
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          padding: "0 6px 20px",
+          borderBottom: `1px solid ${colors.hairline}`,
+          marginBottom: 16,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            background: "#fff",
+            border: `1px solid ${colors.border}`,
+            overflow: "hidden",
+            flexShrink: 0,
+            position: "relative",
+          }}
+        >
           <Image src="/assets/daystar-logo.jpeg" alt="" fill style={{ objectFit: "cover" }} />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 12.5, fontWeight: 600, letterSpacing: "-0.01em" }}>Small Groups</div>
-          <div style={{ fontSize: 10, color: colors.faint2, letterSpacing: "0.04em", textTransform: "uppercase" }}>Daystar</div>
+          <div style={{ fontSize: 10, color: colors.faint2, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Daystar
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }} className="dcc-sidebar-items">
         {items.map((n) => {
-          const on = !!n.id && state.screen === n.id;
+          const on = pathname === n.href || (n.href !== "/cell" && n.href !== "/coordinator" && pathname?.startsWith(n.href));
+          const badge = badges[n.href];
           return (
-            <div
-              key={n.label}
-              onClick={() => n.id && set({ screen: n.id })}
+            <Link
+              key={n.href}
+              href={n.href}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: "9px 10px",
+                padding: "11px 10px",
+                minHeight: 44,
                 borderRadius: 9,
-                cursor: n.id ? "pointer" : "default",
                 fontSize: 13,
                 fontWeight: 500,
                 letterSpacing: "-0.01em",
                 background: on ? colors.redSoft : "transparent",
                 color: on ? colors.red : colors.muted,
+                textDecoration: "none",
               }}
             >
-              <span style={{ fontSize: 14, width: 16, textAlign: "center" }}>{n.icon}</span>
+              <span style={{ fontSize: 14, width: 16, textAlign: "center" }} aria-hidden>
+                {n.icon}
+              </span>
               <span style={{ flex: 1 }}>{n.label}</span>
-              {n.badge && (
-                <span style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: colors.redSoft, color: colors.red, fontFamily: mono }}>
-                  {n.badge}
+              {!!badge && (
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 6,
+                    background: colors.redSoft,
+                    color: colors.red,
+                    fontFamily: mono,
+                  }}
+                >
+                  {badge}
                 </span>
               )}
-            </div>
+            </Link>
           );
         })}
       </div>
 
-      <div style={{ marginTop: "auto", paddingTop: 20, borderTop: `1px solid ${colors.hairline}`, display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 10, background: colors.chipGrey, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: colors.muted, flexShrink: 0 }}>
-          {userInitials}
+      <div
+        className="dcc-user-footer"
+        style={{
+          marginTop: "auto",
+          paddingTop: 20,
+          borderTop: `1px solid ${colors.hairline}`,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            background: colors.chipGrey,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            fontWeight: 600,
+            color: colors.muted,
+            flexShrink: 0,
+          }}
+        >
+          {initials}
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{userName}</div>
-          <div style={{ fontSize: 10.5, color: colors.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{userRole}</div>
+        <div className="dcc-user-meta" style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {userName}
+          </div>
+          <div style={{ fontSize: 10.5, color: colors.faint2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {userRoleLabel}
+          </div>
         </div>
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            aria-label="Sign out"
+            style={{ border: "none", background: "transparent", color: colors.faint, cursor: "pointer", fontSize: 12, minHeight: 44, minWidth: 44 }}
+          >
+            ⏻
+          </button>
+        </form>
       </div>
-    </div>
+    </nav>
   );
 }

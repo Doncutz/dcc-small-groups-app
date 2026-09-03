@@ -1,6 +1,7 @@
 "use client";
 
 import { CSSProperties, ReactNode, useState } from "react";
+import Link from "next/link";
 import { colors } from "@/lib/tokens";
 
 export function TextInput({
@@ -157,6 +158,56 @@ export function Button({
     >
       {children}
     </button>
+  );
+}
+
+const BTN_VARIANT_STYLE: Record<BtnVariant, CSSProperties> = {
+  primary: { border: "none", background: colors.red, color: "#fff" },
+  dark: { border: "none", background: colors.ink, color: "#fff" },
+  secondary: { border: `1.5px solid ${colors.borderStrong}`, background: "#fff", color: colors.ink },
+  "danger-outline": { border: `1.5px solid ${colors.borderStrong}`, background: "#fff", color: colors.ink },
+  ghost: { border: "none", background: "transparent", color: colors.faint },
+};
+
+/** Same look as {@link Button}, but a real anchor — safe to use where a `<button>` would nest inside a `<Link>`. */
+export function LinkButton({
+  children,
+  href,
+  variant = "secondary",
+  fullWidth = false,
+  style,
+  padding = "13px 20px",
+  fontSize = 14,
+}: {
+  children: ReactNode;
+  href: string;
+  variant?: BtnVariant;
+  fullWidth?: boolean;
+  style?: CSSProperties;
+  padding?: string;
+  fontSize?: number;
+}) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "inline-block",
+        textAlign: "center",
+        cursor: "pointer",
+        fontWeight: 600,
+        padding,
+        fontSize,
+        borderRadius: 12,
+        letterSpacing: "-0.01em",
+        width: fullWidth ? "100%" : undefined,
+        minHeight: 44,
+        boxSizing: "border-box",
+        ...BTN_VARIANT_STYLE[variant],
+        ...style,
+      }}
+    >
+      {children}
+    </Link>
   );
 }
 

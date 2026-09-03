@@ -1,21 +1,15 @@
-"use client";
+import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/lib/auth/session";
+import { resolveUserScope } from "@/lib/auth/scope";
+import { roleGroupFor, homePathFor } from "@/lib/auth/roleHome";
 
-import { AppProvider, useApp } from "@/lib/state";
-import { LoginScreen } from "@/components/auth/LoginScreen";
-import { SignupScreen } from "@/components/auth/SignupScreen";
-import { AppShell } from "@/components/shell/AppShell";
+export default async function Home() {
+  const session = await getCurrentSession();
+  if (!session) redirect("/sign-in");
 
-function Root() {
-  const { state } = useApp();
-  if (state.screen === "login") return <LoginScreen />;
-  if (state.screen === "signup") return <SignupScreen />;
-  return <AppShell />;
-}
+  const scope = await resolveUserScope(session.userId);
+  const group = roleGroupFor(scope.roles.map((r) => r.role));
 
-export default function Home() {
-  return (
-    <AppProvider>
-      <Root />
-    </AppProvider>
-  );
+  if (group === "super_admin" && !session.mfaVerifiedAt) redirect("/sign-in/verify");
+  redirect(homePathFor(group));
 }

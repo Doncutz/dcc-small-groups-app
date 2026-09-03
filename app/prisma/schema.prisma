@@ -187,10 +187,34 @@ model CellMember {
   joinedOn   DateTime
   active     Boolean        @default(true)
 
+  attendance CellMemberAttendance[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([cellId])
+}
+
+/**
+ * Per-member, per-Sunday presence. One row per (member, report) once that
+ * Sunday's figures are recorded — this is what the members register's
+ * 8-Sunday presence strip and "missed 3+ weeks" rail are derived from; the
+ * report's own `membersPresent` figure stays the sole source of truth for
+ * the cell-wide attendance count.
+ */
+model CellMemberAttendance {
+  id             String       @id @default(cuid())
+  cellMemberId   String
+  cellMember     CellMember   @relation(fields: [cellMemberId], references: [id], onDelete: Cascade)
+  sundayReportId String
+  sundayReport   SundayReport @relation(fields: [sundayReportId], references: [id], onDelete: Cascade)
+  present        Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cellMemberId, sundayReportId])
+  @@index([sundayReportId])
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +289,8 @@ model SundayReport {
   // Comments (1 numeric + free text)
   testimoniesShared Int?
   comments          String?
+
+  memberAttendance CellMemberAttendance[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

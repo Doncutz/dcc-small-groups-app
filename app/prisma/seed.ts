@@ -192,7 +192,7 @@ async function main() {
   await prisma.cell.createMany({ data: cells });
   await prisma.cellMember.createMany({ data: cellMembers });
 
-  await seedReportsAndFollowUps(cells, reviewerByCellUnit);
+  await seedReportsAndFollowUps(cells, reviewerByCellUnit, cellMembers);
 
   await prisma.appSetting.upsert({
     where: { key: "followUpOverdueDays" },
@@ -214,6 +214,7 @@ function mostRecentSundayUTC(now: Date): Date {
 async function seedReportsAndFollowUps(
   cells: { id: string; unitId: string }[],
   reviewerByCellUnit: Map<string, string>,
+  cellMembers: { id: string; cellId: string; active: boolean }[],
 ) {
   const now = new Date();
   const lastSunday = mostRecentSundayUTC(now);
@@ -272,6 +273,8 @@ async function seedReportsAndFollowUps(
   }
   console.log(`Seeded ${reports.length} Sunday reports.`);
 
+  await seedMemberAttendance(reports, cellMembers);
+
   // Follow-ups: a handful of new guests/converts per section, some overdue.
   const followUps: {
     id: string; personName: string; phone: string; type: "new_guest" | "new_convert";
@@ -300,6 +303,52 @@ async function seedReportsAndFollowUps(
   });
   if (followUps.length) await prisma.followUp.createMany({ data: followUps });
   console.log(`Seeded ${followUps.length} follow-ups.`);
+}
+
+/**
+ * One attendance row per (active member, report). Presence follows a
+ * Markov-ish walk per member (streaky, not independent draws each week) so
+ * some members genuinely show a 3+ week absence streak for the "missed
+ * lately" rail to surface — keyed on the member's own index, never on name.
+ */
+async function seedMemberAttendance(
+  reports: { id: string; cellId: string; serviceDate: Date }[],
+  cellMembers: { id: string; cellId: string; active: boolean }[],
+) {
+  const reportsByCell = new Map<string, { id: string; serviceDate: Date }[]>();
+  for (const r of reports) {
+    if (!reportsByCell.has(r.cellId)) reportsByCell.set(r.cellId, []);
+    reportsByCell.get(r.cellId)!.push({ id: r.id, serviceDate: r.serviceDate });
+  }
+  for (const list of reportsByCell.values()) list.sort((a, b) => a.serviceDate.getTime() - b.serviceDate.getTime());
+
+  const membersByCell = new Map<string, { id: string; active: boolean }[]>();
+  for (const m of cellMembers) {
+    if (!m.active) continue;
+    if (!membersByCell.has(m.cellId)) membersByCell.set(m.cellId, []);
+    membersByCell.get(m.cellId)!.push(m);
+  }
+
+  const rows: { id: string; cellMemberId: string; sundayReportId: string; present: boolean }[] = [];
+  let memberIndex = 0;
+  for (const [cellId, members] of membersByCell) {
+    const cellReports = reportsByCell.get(cellId) ?? [];
+    for (const member of members) {
+      const r = mulberry32(memberIndex++ * 486187739 + 11);
+      const baseRate = 0.55 + r() * 0.4;
+      let present = r() < baseRate;
+      for (const report of cellReports) {
+        present = r() < 0.25 ? !present : r() < baseRate; // streaky, not independent
+        rows.push({ id: randomUUID(), cellMemberId: member.id, sundayReportId: report.id, present });
+      }
+    }
+  }
+
+  const chunkSize = 1000;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    await prisma.cellMemberAttendance.createMany({ data: rows.slice(i, i + chunkSize) });
+  }
+  console.log(`Seeded ${rows.length} member attendance rows.`);
 }
 
 async function seedSuperAdminAndDemoInvites() {
